@@ -91,6 +91,10 @@ The plaquette file written by `metropolis` stores `step plaquette acceptance_rat
 Wilson-loop multihit measurements in this executable use Metropolis local-link
 updates for the averaged links.
 
+Wilson-loop length pairs may be written explicitly as `[L, T]` or with the
+legacy fixed-first compact form. For example, `["1:16", "1:28"]` expands to
+`[1, 16]`, `[1, 17]`, ..., `[1, 28]`.
+
 ### Example input.yaml
 
 ```yaml

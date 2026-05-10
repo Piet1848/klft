@@ -24,6 +24,20 @@ inline bool loadInputConfig(const std::string &filename, YAML::Node &config) {
   }
 }
 
+inline bool parseIndexToken(const std::string &token, index_t &value) {
+  try {
+    size_t pos = 0;
+    const index_t parsed = std::stoi(token, &pos);
+    if (pos != token.size()) {
+      return false;
+    }
+    value = parsed;
+    return true;
+  } catch (...) {
+    return false;
+  }
+}
+
 inline std::vector<index_t> parseIndexRange(const YAML::Node &node, bool &ok) {
   ok = true;
   std::vector<index_t> values;
@@ -34,31 +48,84 @@ inline std::vector<index_t> parseIndexRange(const YAML::Node &node, bool &ok) {
 
   const std::string token = node.as<std::string>();
   const size_t colon = token.find(':');
-  if (colon == std::string::npos) {
-    try {
-      values.push_back(node.as<index_t>());
-      return values;
-    } catch (...) {
-      ok = false;
-      return values;
-    }
-  }
-
-  try {
-    const index_t start = std::stoi(token.substr(0, colon));
-    const index_t end = std::stoi(token.substr(colon + 1));
-    if (start > end) {
-      ok = false;
-      return values;
-    }
-    for (index_t i = start; i <= end; ++i) {
-      values.push_back(i);
-    }
-    return values;
-  } catch (...) {
+  if (colon != std::string::npos &&
+      token.find(':', colon + 1) != std::string::npos) {
     ok = false;
     return values;
   }
+
+  if (colon == std::string::npos) {
+    index_t value = 0;
+    ok = parseIndexToken(token, value);
+    if (ok) {
+      values.push_back(value);
+    }
+    return values;
+  }
+
+  index_t start = 0;
+  index_t end = 0;
+  if (!parseIndexToken(token.substr(0, colon), start) ||
+      !parseIndexToken(token.substr(colon + 1), end) || start > end) {
+    ok = false;
+    return values;
+  }
+  for (index_t i = start; i <= end; ++i) {
+    values.push_back(i);
+  }
+  return values;
+}
+
+inline bool parseIndexPairToken(const YAML::Node &node,
+                                Kokkos::Array<index_t, 2> &pair) {
+  if (!node || !node.IsScalar()) {
+    return false;
+  }
+
+  const std::string token = node.as<std::string>();
+  const size_t colon = token.find(':');
+  if (colon == std::string::npos ||
+      token.find(':', colon + 1) != std::string::npos) {
+    return false;
+  }
+
+  index_t a = 0;
+  index_t b = 0;
+  if (!parseIndexToken(token.substr(0, colon), a) ||
+      !parseIndexToken(token.substr(colon + 1), b)) {
+    return false;
+  }
+  pair = Kokkos::Array<index_t, 2>{a, b};
+  return true;
+}
+
+inline bool tryParseLegacyFixedFirstLoopRange(
+    const YAML::Node &pair, const char *field_name,
+    std::vector<Kokkos::Array<index_t, 2>> &output, bool &handled) {
+  handled = false;
+  Kokkos::Array<index_t, 2> start{};
+  Kokkos::Array<index_t, 2> end{};
+  if (!parseIndexPairToken(pair[0], start) ||
+      !parseIndexPairToken(pair[1], end)) {
+    return true;
+  }
+  if (start[0] != end[0]) {
+    return true;
+  }
+
+  handled = true;
+  if (start[0] < 1 || start[1] < 1 || end[1] < 1) {
+    printf("Error: %s entries must be positive\n", field_name);
+    return false;
+  }
+  if (start[1] > end[1]) {
+    printf("Error: %s legacy range end must be >= start\n", field_name);
+    return false;
+  }
+  for (index_t b = start[1]; b <= end[1]; ++b) {
+    output.push_back(Kokkos::Array<index_t, 2>{start[0], b});
+  }
+  return true;
 }
 
 inline bool validateLatticeExtents(const index_t L0, const index_t L1,
@@ -222,6 +289,14 @@ inline bool parseLoopLengthPairs(
       printf("Error: each %s entry must have exactly two elements\n",
              field_name);
       return false;
+    }
+    bool handledLegacyRange = false;
+    if (!tryParseLegacyFixedFirstLoopRange(pair, field_name, output,
+                                           handledLegacyRange)) {
+      return false;
+    }
+    if (handledLegacyRange) {
+      continue;
     }
     bool ok0 = false;
     bool ok1 = false;

@@ -52,8 +52,8 @@ inline void write_common_observable_sample(std::ofstream &file) {
   write_sample_nested_child_offset(file);
   file << "  W_temp_L_T_pairs:\n"
        << "    - [2, 2]\n"
-       << "    - [3, 3]\n"
-       << "    - [4, 4]\n"
+       << "    - [\"3:4\", 3]\n"
+       << "    - [4, \"4:5\"]\n"
        << "  W_mu_nu_pairs:\n";
 
   for (const auto &[mu, nu] : sample_plane_pairs()) {
@@ -62,8 +62,8 @@ inline void write_common_observable_sample(std::ofstream &file) {
 
   file << "  W_Lmu_Lnu_pairs:\n"
        << "    - [2, 2]\n"
-       << "    - [3, 3]\n"
-       << "    - [4, 3]\n"
+       << "    - [\"3:4\", 3]\n"
+       << "    - [4, \"3:4\"]\n"
        << "  plaquette_filename: \"plaquette.out\"\n"
        << "  W_temp_filename: \"w_temp.out\"\n"
        << "  W_mu_nu_filename: \"w_mu_nu.out\"\n"

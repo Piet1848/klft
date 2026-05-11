@@ -76,58 +76,6 @@ inline std::vector<index_t> parseIndexRange(const YAML::Node &node, bool &ok) {
   return values;
 }
 
-inline bool parseIndexPairToken(const YAML::Node &node,
-                                Kokkos::Array<index_t, 2> &pair) {
-  if (!node || !node.IsScalar()) {
-    return false;
-  }
-
-  const std::string token = node.as<std::string>();
-  const size_t colon = token.find(':');
-  if (colon == std::string::npos ||
-      token.find(':', colon + 1) != std::string::npos) {
-    return false;
-  }
-
-  index_t a = 0;
-  index_t b = 0;
-  if (!parseIndexToken(token.substr(0, colon), a) ||
-      !parseIndexToken(token.substr(colon + 1), b)) {
-    return false;
-  }
-  pair = Kokkos::Array<index_t, 2>{a, b};
-  return true;
-}
-
-inline bool tryParseLegacyFixedFirstLoopRange(
-    const YAML::Node &pair, const char *field_name,
-    std::vector<Kokkos::Array<index_t, 2>> &output, bool &handled) {
-  handled = false;
-  Kokkos::Array<index_t, 2> start{};
-  Kokkos::Array<index_t, 2> end{};
-  if (!parseIndexPairToken(pair[0], start) ||
-      !parseIndexPairToken(pair[1], end)) {
-    return true;
-  }
-  if (start[0] != end[0]) {
-    return true;
-  }
-
-  handled = true;
-  if (start[0] < 1 || start[1] < 1 || end[1] < 1) {
-    printf("Error: %s entries must be positive\n", field_name);
-    return false;
-  }
-  if (start[1] > end[1]) {
-    printf("Error: %s legacy range end must be >= start\n", field_name);
-    return false;
-  }
-  for (index_t b = start[1]; b <= end[1]; ++b) {
-    output.push_back(Kokkos::Array<index_t, 2>{start[0], b});
-  }
-  return true;
-}
-
 inline bool validateLatticeExtents(const index_t L0, const index_t L1,
                                    const index_t L2, const index_t L3,
                                    const char *section_name) {
@@ -289,14 +237,6 @@ inline bool parseLoopLengthPairs(
       printf("Error: each %s entry must have exactly two elements\n",
              field_name);
       return false;
-    }
-    bool handledLegacyRange = false;
-    if (!tryParseLegacyFixedFirstLoopRange(pair, field_name, output,
-                                           handledLegacyRange)) {
-      return false;
-    }
-    if (handledLegacyRange) {
-      continue;
     }
     bool ok0 = false;
     bool ok1 = false;
